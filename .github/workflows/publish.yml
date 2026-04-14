@@ -1,111 +1,228 @@
-name: Publish to PyPI
+name: Publish Workflow
+permissions:
+  contents: read
 
 on:
   push:
-    branches:
-      - "main"
-    tags:
-      - "*"
-
-permissions:
-  contents: "read"
+    tag:
+      - v*
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description:  Provide the tag to publish the package
+        required: false
+      fixed_cves:
+        description:  Provide the list of CVEs fixed by this version
+        required: false
 
 jobs:
-  build:
-    if: github.repository_owner == 'urllib3'
-    name: "Build distribution 📦"
-    runs-on: "ubuntu-latest"
-    outputs:
-      hashes: ${{ steps.hash.outputs.hashes }}
-      artifact-id: ${{ steps.upload-artifact.outputs.artifact-id }}
+  build_test:
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.release_version != '' }}
 
     steps:
-      - name: "Checkout repository"
-        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+
+      - name: Check out code
+        uses: actions/checkout@v4.1.7
         with:
-          fetch-depth: 0 # Needed to fetch the version from git
-          persist-credentials: false
+          ref: ${{ github.event.inputs.release_version }}
+          submodules: true
 
-      - name: "Setup Python"
-        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+      - name: Install JFrog CLI
+        run: curl -fL https://install-cli.jfrog.io | sh
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          python-version: "3.x"
+          python-version: |
+            3.12
+            3.11
+            3.10
 
-      - name: "Install dependencies"
-        run: python -m pip install build==0.8.0
-
-      - name: "Build dists"
+      - name: Upgrade pip and install core tools
         run: |
-          SOURCE_DATE_EPOCH=$(git log -1 --pretty=%ct) \
-          python -m build
+          python -m pip install --upgrade pip
+          python -m pip install build setuptools wheel twine
 
-      - name: "Generate hashes"
-        id: hash
+      - name: Configure pip to use Artifactory
         run: |
-          cd dist && echo "hashes=$(sha256sum * | base64 -w0)" >> $GITHUB_OUTPUT
+          mkdir -p ~/.config/pip
+          cat > ~/.config/pip/pip.conf <<EOF
+          [global]
+          extra-index-url = https://${{ secrets.CUSTOMER_ZERO_USERNAME }}:${{ secrets.CUSTOMER_ZERO_TOKEN }}@${{ secrets.JFROG_HOST_NAME }}/artifactory/api/pypi/${{ secrets.PYPI_GOS_ALL_ARTIFACTORY }}/simple
+          trusted-host = ${{ secrets.JFROG_HOST_NAME }}
+          EOF
 
-      - name: "Upload dists"
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
-        id: upload-artifact
+      - name: Detect and install project dependencies
+        run: |
+          if [ -f pyproject.toml ]; then
+            echo "Detected pyproject.toml"
+            # poetry and flit support is yet to be added
+            # Default to PEP 517 build backend
+            python -m pip install -e .
+          elif [ -f requirements.txt ]; then
+            echo "Detected requirements.txt"
+            python -m pip install -r requirements.txt
+          elif [ -f setup.py ]; then
+            echo "Detected setup.py"
+            python -m pip install -e .
+          else
+            echo "No recognizable dependency file found!"
+          fi
+
+      - name: Detect and run tests
+        run: |
+          echo "Detecting test framework..."
+          python -m venv venv
+          source venv/bin/activate
+          python -m pip install pytest tox || true
+
+          if [ -f tox.ini ] || grep -q '\[tool.tox\]' pyproject.toml 2>/dev/null; then
+            echo "Running tests with tox..."
+            tox || echo "tox tests failed or not configured correctly"
+
+          elif [ -f pytest.ini ] || [ -d tests ] || grep -q '\[tool.pytest.ini_options\]' pyproject.toml 2>/dev/null; then
+            echo "Running tests with pytest..."
+            # Install test requirements if they exist
+            if [ -f test/requirements.txt ]; then
+              echo "Installing test dependencies from test/requirements.txt..."
+              python -m pip install -r test/requirements.txt || echo "Failed to install test requirements"
+            elif [ -f tests/requirements.txt ]; then
+              echo "Installing test dependencies from tests/requirements.txt..."
+              python -m pip install -r tests/requirements.txt || echo "Failed to install test requirements"
+            elif [ -f requirements-test.txt ]; then
+              echo "Installing test dependencies from requirements-test.txt..."
+              python -m pip install -r requirements-test.txt || echo "Failed to install test requirements"
+            elif [ -f test-requirements.txt ]; then
+              echo "Installing test dependencies from test-requirements.txt..."
+              python -m pip install -r test-requirements.txt || echo "Failed to install test requirements"
+            fi
+            python -m pytest -v || echo "pytest tests failed"
+
+          elif find . -type f -name "test_*.py" | grep -q .; then
+            echo "Running tests with unittest..."
+            python -m unittest discover -s . -p "test_*.py" || echo "unittest tests failed"
+
+          else
+            echo "No tests detected; skipping test stage"
+          fi
+
+  publish:
+    needs: build_test
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.release_version != '' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4.1.7
         with:
-          name: "dist"
-          path: "dist/"
-          if-no-files-found: error
-          retention-days: 5
+          ref: ${{ github.event.inputs.release_version }}
+          submodules: true
 
-  publish-to-pypi-and-github:
-    name: "Publish to PyPI"
-    if: ${{ github.ref_type == 'tag' }}
-    needs: ["build"]
-    permissions:
-      contents: write # Needed for making GitHub releases
-      id-token: write # Needed for trusted publishing to PyPI.
-    runs-on: "ubuntu-latest"
-    environment:
-      name: "publish"
+      - name: Install JFrog CLI
+        run: curl -fL https://install-cli.jfrog.io | sh
 
-    steps:
-    - name: "Download dists"
-      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-      with:
-        artifact-ids: ${{ needs.build.outputs.artifact-id }}
-        path: "dist/"
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: |
+            3.12
+            3.11
+            3.10
 
-    - name: "Upload dists to a new GitHub Release Draft"
-      env:
-        GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
-      run: |
-        gh release create "$GITHUB_REF_NAME" \
-          --repo "$GITHUB_REPOSITORY" \
-          --draft \
-          --title "$GITHUB_REF_NAME" \
-          --notes "" \
-          --verify-tag
-        gh release upload "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY"
+      - name: Upgrade pip and install core tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install build setuptools wheel twine
 
-    - name: "Publish dists to PyPI"
-      uses: pypa/gh-action-pypi-publish@ed0c53931b1dc9bd32cbe73a98c7f6766f8a527e # v1.13.0
-      with:
-        attestations: true
+      - name: Configure pip to use Artifactory
+        run: |
+          mkdir -p ~/.config/pip
+          cat > ~/.config/pip/pip.conf <<EOF
+          [global]
+          extra-index-url = https://${{ secrets.CUSTOMER_ZERO_USERNAME }}:${{ secrets.CUSTOMER_ZERO_TOKEN }}@${{ secrets.JFROG_HOST_NAME }}/artifactory/api/pypi/${{ secrets.PYPI_GOS_ALL_ARTIFACTORY }}/simple
+          trusted-host = ${{ secrets.JFROG_HOST_NAME }}
+          EOF
 
-  publish-to-test-pypi:
-    name: "Publish to Test PyPI"
-    needs: ["build"]
-    permissions:
-      id-token: write # Needed for trusted publishing to PyPI.
-    runs-on: "ubuntu-latest"
-    environment:
-      name: "testpypi"
+      - name: Detect and install project dependencies
+        run: |
+          if [ -f pyproject.toml ]; then
+            echo "Detected pyproject.toml"
+            # poetry and flit support is yet to be added
+            # Default to PEP 517 build backend
+            python -m pip install -e .
+          elif [ -f requirements.txt ]; then
+            echo "Detected requirements.txt"
+            python -m pip install -r requirements.txt
+          elif [ -f setup.py ]; then
+            echo "Detected setup.py"
+            python -m pip install -e .
+          else
+            echo "No recognizable dependency file found!"
+          fi
 
-    steps:
-    - name: "Download dists"
-      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-      with:
-        artifact-ids: ${{ needs.build.outputs.artifact-id }}
-        path: "dist/"
+      - name: Build package
+        run: |
+          if [ -f requirements.txt ]; then
+            # Packaging is executed inside a venv. Include requirements.txt as setup.py may refer to it
+            echo "Updated MANIFEST.in for requirements.txt"
+            echo 'include requirements.txt' >> MANIFEST.in
+          fi
+          python -m build # builds both wheel + sdist
+        continue-on-error: false
 
-    - name: "Publish dists to Test PyPI"
-      uses: pypa/gh-action-pypi-publish@ed0c53931b1dc9bd32cbe73a98c7f6766f8a527e # v1.13.0
-      with:
-        repository-url: https://test.pypi.org/legacy/
-        attestations: true
+      - name: Import GPG private key
+        run: |
+            echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import --pinentry-mode loopback
+
+      - name: Sign all artifacts
+        run: |
+          for f in dist/*; do
+            echo "Signing $f"
+            gpg --batch --yes --armor \
+                --pinentry-mode loopback \
+                --detach-sign "$f"
+          done
+
+      - name: Publish to JFrog Artifactory
+        env:
+          ARTIFACTORY_URL: https://${{ secrets.JFROG_HOST_NAME }}/artifactory/api/pypi/${{ secrets.PYPI_STAGING_ARTIFACTORY }}
+          ARTIFACTORY_USER: ${{ secrets.JFROG_USERNAME }}
+          ARTIFACTORY_PASSWORD: ${{ secrets.JFROG_PASSWORD }}
+        run: |
+          twine upload \
+            --repository-url "${ARTIFACTORY_URL}" \
+            -u "${ARTIFACTORY_USER}" -p "${ARTIFACTORY_PASSWORD}" \
+            dist/* 2>&1 | tee pypi-publish.log
+
+      - name: Upload publish log to Artifactory
+        run: |
+          PROJECT_NAME=${GITHUB_REPOSITORY##*/}
+          jf rt u "pypi-publish.log" "${{ secrets.PYPI_STAGING_ARTIFACTORY }}/logs/publish/${PROJECT_NAME}-${{ github.event.inputs.release_version }}/" --url https://${{ secrets.JFROG_HOST_NAME }}/artifactory/ --access-token=${{ secrets.JFROG_PASSWORD }}
+
+      - name: Upload all signed files and set CVE property in Artifactory
+        run: |
+          PROJECT_NAME=${GITHUB_REPOSITORY##*/}
+          # Extract PyPI version from the tag
+          RAW_VERSION=${{ github.event.inputs.release_version }}
+          # Strip leading "v"
+          version="${RAW_VERSION#v}"
+          # Split and reconstruct
+          main="${version%%-*}"       # 1.0.60
+          rest="${version#*-}"        # lineaje-01
+          label="${rest%-*}"          # lineaje
+          num="${rest##*-}"           # 01
+          num=$((10#$num))            # remove leading zeros
+          converted_version="${main}+${label}.${num}"
+
+          # Avoid setting additional vcs properties so that only one callback is executed
+          export JFROG_CLI_CI_VCS_PROPS_DISABLED=true
+          pushd dist > /dev/null 2>&1
+          jf rt u "*.asc" "${{ secrets.PYPI_STAGING_ARTIFACTORY }}/${PROJECT_NAME}/${converted_version}/" --url https://${{ secrets.JFROG_HOST_NAME }}/artifactory/ --access-token=${{ secrets.JFROG_PASSWORD }}
+          tar_gz_asc_file=$(find . -type f -name "*.tar.gz.asc" -print -quit)
+          popd > /dev/null 2>&1
+
+          tar_gz_asc_file=$(basename ${tar_gz_asc_file})
+          # Property is set on the source distribution signature file to prevent multiple calls
+          jf rt sp "${{ secrets.PYPI_STAGING_ARTIFACTORY }}/${PROJECT_NAME}/${converted_version}/${tar_gz_asc_file}" "fixed_cves=${{ github.event.inputs.fixed_cves }}" --url https://${{ secrets.JFROG_HOST_NAME }}/artifactory/ --access-token ${{ secrets.JFROG_PASSWORD }}
+
