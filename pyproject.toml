@@ -1,7 +1,9 @@
-# This file is protected via CODEOWNERS
-
 [build-system]
-requires = ["hatchling>=1.27.0,<2", "hatch-vcs>=0.4.0,<0.6.0", "setuptools-scm>=8,<10"]
+requires = [
+    "hatchling>=1.27.0,<2",
+    "hatch-vcs>=0.4.0,<0.6.0",
+    "setuptools-scm>=8,<10",
+]
 build-backend = "hatchling.build"
 
 [project]
@@ -9,52 +11,70 @@ name = "urllib3"
 description = "HTTP library with thread-safe connection pooling, file post, and more."
 readme = "README.md"
 license = "MIT"
-license-files = ["LICENSE.txt"]
-keywords = ["urllib", "httplib", "threadsafe", "filepost", "http", "https", "ssl", "pooling"]
+license-files = [
+    "LICENSE.txt",
+]
+keywords = [
+    "urllib",
+    "httplib",
+    "threadsafe",
+    "filepost",
+    "http",
+    "https",
+    "ssl",
+    "pooling",
+]
 authors = [
-  {name = "Andrey Petrov", email = "andrey.petrov@shazow.net"}
+    { name = "Andrey Petrov", email = "andrey.petrov@shazow.net" },
 ]
 maintainers = [
-  {name = "Seth Michael Larson", email="sethmichaellarson@gmail.com"},
-  {name = "Quentin Pradet", email="quentin@pradet.me"},
-  {name = "Illia Volochii", email = "illia.volochii@gmail.com"},
+    { name = "Lineaje DepFixer", email = "221268890+Lineaje-DepFixer@users.noreply.github.com" },
 ]
 classifiers = [
-  "Environment :: Web Environment",
-  "Intended Audience :: Developers",
-  "Operating System :: OS Independent",
-  "Programming Language :: Python",
-  "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.9",
-  "Programming Language :: Python :: 3.10",
-  "Programming Language :: Python :: 3.11",
-  "Programming Language :: Python :: 3.12",
-  "Programming Language :: Python :: 3.13",
-  "Programming Language :: Python :: 3.14",
-  "Programming Language :: Python :: 3 :: Only",
-  "Programming Language :: Python :: Implementation :: CPython",
-  "Programming Language :: Python :: Implementation :: PyPy",
-  "Programming Language :: Python :: Free Threading :: 2 - Beta",
-  "Topic :: Internet :: WWW/HTTP",
-  "Topic :: Software Development :: Libraries",
+    "Environment :: Web Environment",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: Implementation :: PyPy",
+    "Programming Language :: Python :: Free Threading :: 2 - Beta",
+    "Topic :: Internet :: WWW/HTTP",
+    "Topic :: Software Development :: Libraries",
 ]
 requires-python = ">=3.9"
-dynamic = ["version"]
+version = "2.6.2+lineaje.1"
 
 [project.optional-dependencies]
 brotli = [
-  "brotli>=1.2.0; platform_python_implementation == 'CPython'",
-  "brotlicffi>=1.2.0.0; platform_python_implementation != 'CPython'"
+    "brotli>=1.2.0; platform_python_implementation == 'CPython'",
+    "brotlicffi>=1.2.0.0; platform_python_implementation != 'CPython'",
 ]
 zstd = [
-  "backports.zstd>=1.0.0; python_version<'3.14'",
+    "backports.zstd>=1.0.0; python_version<'3.14'",
 ]
 socks = [
-  "PySocks>=1.5.6,<2.0,!=1.5.7",
+    "PySocks>=1.5.6,<2.0,!=1.5.7",
 ]
 h2 = [
-  "h2>=4,<5"
+    "h2>=4,<5",
 ]
+
+[project.urls]
+Changelog = "https://github.com/urllib3/urllib3/blob/main/CHANGES.rst"
+Documentation = "https://urllib3.readthedocs.io"
+Code = "https://github.com/urllib3/urllib3"
+"Issue tracker" = "https://github.com/urllib3/urllib3/issues"
+Homepage = "https://github.com/lineaje-labs-gos/urllib3-urllib3"
+Repository = "https://github.com/lineaje-labs-gos/urllib3-urllib3"
+Tracker = "https://github.com/lineaje-labs-gos/urllib3-urllib3/issues"
 
 [dependency-groups]
 dev = [
@@ -107,34 +127,33 @@ docs = [
     "sphinxext-opengraph>=0.9.1",
 ]
 
-[project.urls]
-"Changelog" = "https://github.com/urllib3/urllib3/blob/main/CHANGES.rst"
-"Documentation" = "https://urllib3.readthedocs.io"
-"Code" = "https://github.com/urllib3/urllib3"
-"Issue tracker" = "https://github.com/urllib3/urllib3/issues"
-
 [tool.hatch.version]
 source = "vcs"
+
 [tool.hatch.version.raw-options]
 local_scheme = "no-local-version"
+
 [tool.hatch.build.hooks.vcs]
 version-file = "src/urllib3/_version.py"
 
 [tool.hatch.build.targets.sdist]
 include = [
-  "/docs",
-  "/dummyserver",
-  "/src",
-  "/test",
-  "/uv.lock",
-  "/CHANGES.rst",
-  "/README.md",
-  "/LICENSE.txt",
+    "/docs",
+    "/dummyserver",
+    "/src",
+    "/test",
+    "/uv.lock",
+    "/CHANGES.rst",
+    "/README.md",
+    "/LICENSE.txt",
 ]
 
 [tool.pytest.ini_options]
 xfail_strict = true
-python_classes = ["Test", "*TestCase"]
+python_classes = [
+    "Test",
+    "*TestCase",
+]
 markers = [
     "limit_memory: Limit memory with memray",
     "requires_network: This test needs access to the Internet",
@@ -148,21 +167,19 @@ markers = [
 log_level = "DEBUG"
 filterwarnings = [
     "error",
-    '''default:urllib3 v2 only supports OpenSSL 1.1.1+.*''',
-    '''default:No IPv6 support. Falling back to IPv4:urllib3.exceptions.HTTPWarning''',
-    '''default:No IPv6 support. skipping:urllib3.exceptions.HTTPWarning''',
-    '''default:ssl\.TLSVersion\.TLSv1 is deprecated:DeprecationWarning''',
-    '''default:ssl\.PROTOCOL_TLS is deprecated:DeprecationWarning''',
-    '''default:ssl\.PROTOCOL_TLSv1 is deprecated:DeprecationWarning''',
-    '''default:ssl\.TLSVersion\.TLSv1_1 is deprecated:DeprecationWarning''',
-    '''default:ssl\.PROTOCOL_TLSv1_1 is deprecated:DeprecationWarning''',
-    '''default:ssl\.PROTOCOL_TLSv1_2 is deprecated:DeprecationWarning''',
-    '''default:ssl NPN is deprecated, use ALPN instead:DeprecationWarning''',
-    '''default:Brotli >= 1.2.0 is required to prevent decompression bombs\.:urllib3.exceptions.DependencyWarning''',
-    # https://github.com/SeleniumHQ/selenium/issues/13328
-    '''default:unclosed file <_io\.BufferedWriter name='/dev/null'>:ResourceWarning''',
-    # https://github.com/SeleniumHQ/selenium/issues/14686
-    '''default:setting remote_server_addr in RemoteConnection\(\) is deprecated, set in ClientConfig instance instead:DeprecationWarning'''
+    "default:urllib3 v2 only supports OpenSSL 1.1.1+.*",
+    "default:No IPv6 support. Falling back to IPv4:urllib3.exceptions.HTTPWarning",
+    "default:No IPv6 support. skipping:urllib3.exceptions.HTTPWarning",
+    "default:ssl\\.TLSVersion\\.TLSv1 is deprecated:DeprecationWarning",
+    "default:ssl\\.PROTOCOL_TLS is deprecated:DeprecationWarning",
+    "default:ssl\\.PROTOCOL_TLSv1 is deprecated:DeprecationWarning",
+    "default:ssl\\.TLSVersion\\.TLSv1_1 is deprecated:DeprecationWarning",
+    "default:ssl\\.PROTOCOL_TLSv1_1 is deprecated:DeprecationWarning",
+    "default:ssl\\.PROTOCOL_TLSv1_2 is deprecated:DeprecationWarning",
+    "default:ssl NPN is deprecated, use ALPN instead:DeprecationWarning",
+    "default:Brotli >= 1.2.0 is required to prevent decompression bombs\\.:urllib3.exceptions.DependencyWarning",
+    "default:unclosed file <_io\\.BufferedWriter name='/dev/null'>:ResourceWarning",
+    "default:setting remote_server_addr in RemoteConnection\\(\\) is deprecated, set in ClientConfig instance instead:DeprecationWarning",
 ]
 
 [tool.isort]
@@ -187,11 +204,12 @@ warn_return_any = true
 warn_unused_configs = true
 warn_unused_ignores = true
 enable_error_code = [
-  "ignore-without-code",
+    "ignore-without-code",
 ]
 
 [tool.uv]
 package = true
 
-[tool.uv.sources]
-hypercorn = { git = "https://github.com/urllib3/hypercorn", rev = "urllib3-changes" }
+[tool.uv.sources.hypercorn]
+git = "https://github.com/urllib3/hypercorn"
+rev = "urllib3-changes"
